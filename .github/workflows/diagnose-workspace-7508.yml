@@ -1,0 +1,103 @@
+name: diagnose workspace 7508
+
+on:
+  push:
+    branches:
+      - ci/diagnose-workspace-7508
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+        with:
+          runner-labels: '["ubuntu-24.04"]'
+
+      - name: contracts
+        id: contracts
+        continue-on-error: true
+        run: pnpm --filter @open-design/contracts test
+
+      - name: host
+        id: host
+        continue-on-error: true
+        run: pnpm --filter @open-design/host test
+
+      - name: platform
+        id: platform
+        continue-on-error: true
+        run: pnpm --filter @open-design/platform test
+
+      - name: sidecar
+        id: sidecar
+        continue-on-error: true
+        run: pnpm --filter @open-design/sidecar test
+
+      - name: sidecar proto
+        id: sidecar_proto
+        continue-on-error: true
+        run: pnpm --filter @open-design/sidecar-proto test
+
+      - name: desktop build
+        id: desktop_build
+        continue-on-error: true
+        run: pnpm --filter @open-design/desktop build
+
+      - name: desktop test
+        id: desktop_test
+        continue-on-error: true
+        run: pnpm --filter @open-design/desktop test
+
+      - name: packaged test
+        id: packaged
+        continue-on-error: true
+        run: pnpm --filter @open-design/packaged test
+
+      - name: tools pack test
+        id: tools_pack
+        continue-on-error: true
+        run: pnpm --filter @open-design/tools-pack test
+
+      - name: packaged launcher e2e
+        id: packaged_e2e
+        continue-on-error: true
+        run: pnpm --filter @open-design/e2e test tests/packaged-launcher-update-loop.test.ts
+
+      - name: Summary gate
+        shell: bash
+        env:
+          CONTRACTS: ${{ steps.contracts.outcome }}
+          HOST: ${{ steps.host.outcome }}
+          PLATFORM: ${{ steps.platform.outcome }}
+          SIDECAR: ${{ steps.sidecar.outcome }}
+          SIDECAR_PROTO: ${{ steps.sidecar_proto.outcome }}
+          DESKTOP_BUILD: ${{ steps.desktop_build.outcome }}
+          DESKTOP_TEST: ${{ steps.desktop_test.outcome }}
+          PACKAGED: ${{ steps.packaged.outcome }}
+          TOOLS_PACK: ${{ steps.tools_pack.outcome }}
+          PACKAGED_E2E: ${{ steps.packaged_e2e.outcome }}
+        run: |
+          printf '%s\n' \
+            "contracts=$CONTRACTS" \
+            "host=$HOST" \
+            "platform=$PLATFORM" \
+            "sidecar=$SIDECAR" \
+            "sidecar_proto=$SIDECAR_PROTO" \
+            "desktop_build=$DESKTOP_BUILD" \
+            "desktop_test=$DESKTOP_TEST" \
+            "packaged=$PACKAGED" \
+            "tools_pack=$TOOLS_PACK" \
+            "packaged_e2e=$PACKAGED_E2E"
+          failed=0
+          for value in "$CONTRACTS" "$HOST" "$PLATFORM" "$SIDECAR" "$SIDECAR_PROTO" "$DESKTOP_BUILD" "$DESKTOP_TEST" "$PACKAGED" "$TOOLS_PACK" "$PACKAGED_E2E"; do
+            [ "$value" = success ] || failed=1
+          done
+          exit "$failed"
